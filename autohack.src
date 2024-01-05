@@ -1,0 +1,692 @@
+// Requirements:
+// json.src
+// to be saved into {home_dir}/src/includes/
+// the required includes should also be on the github
+// Edit this line to match your home dir since import_code doesn't like using home_dir variable
+import_code("/home/salmon/src/includes/json.src")
+// Program version output
+version_output = "
+//////////////////////////////////////
+// Simple autohack by 5n4k3         //
+// Modifications by Salmon85        //
+//////////////////////////////////////
+// Version: <color=#70FF70>1.0</color>                     //
+//                                  //
+// Changes                          //
+// Added colour to the output so    //
+// that you can see <color=#A50000><b>root</b></color> easier.    //
+//                                  //
+// Added a cache for the exploits   //
+// so that you don't need to scan   //
+// the libs every time for exploits //
+//////////////////////////////////////
+
+5n4k3 = https://github.com/psimonson
+Salmon85 = https://github.com/salmon85
+"
+// Program usage output
+usage_output = "
+Usage: " + program_path.split("/")[-1] + " [address] [port] [(opt) lanip/password]
+[--setup-server] for configuring the cache server (must be ran on the server and requires root)
+[--serup-server-remote] for configuring the remote cache server (run on your machie, cache server needs ssh setting up and root access)"
+// ************************************************************
+// These are just temporary and are updated via the script
+// Do not touch unless you know what you're doing..
+// Hell I shouldn't even be touching these
+globals.Cacheusername = ""
+globals.Cachepassword = ""
+globals.Cacheaddr = ""
+globals.Cacheport = 22
+globals.UsedCache = false
+globals.Cacheadmin = false
+globals.pc = get_shell.host_computer
+globals.pc_shell = get_shell
+globals.cache_folder = home_dir + "/Config/hackcache"
+globals.cache_config = cache_folder + "/config.txt"
+CacheConfig = {}
+// ************************************************************
+mx = include_lib("/lib/metaxploit.so")
+
+if not mx then
+	mx = include_lib(parent_path(program_path) + "/metaxploit.so")
+end if
+
+if not mx then
+	exit("Cannot find metaxploit.so in /lib/ or current directory")
+end if
+
+if params[0] == "-v" or params[0] == "--version" then
+	exit(version_output)
+end if
+// Start of Functions
+
+TestRepo = function(repo)
+	write_access = false
+	read_access = false
+	
+	if repo.host_computer.File("/home/ftpguest/hackcache").has_permission("w") then
+		write_access = true
+	end if
+	
+	if repo.host_computer.File("/home/ftpguest/hackcache").has_permission("r") then
+		read_access = true
+	end if
+	wait(1)
+	
+	if write_access then
+		print("<color=#FF1010>WARNING:</color> account has write access, you should fix this and retry")
+	end if
+	
+	if read_access then
+		return true
+else
+		print("Unable to read the test file on the server. Make sure there is a file called test in /home/ftpguest/hackcache/")
+	end if
+end function
+
+CreateCache = function()
+	CacheConfig.usecache = false
+	CacheConfig.admin = false
+    CacheConfig.server = {}
+	CacheConfig.server.ip = "127.0.0.1"
+	CacheConfig.server.port = 22
+	CacheConfig.server.username = "ftpguest"
+	print("\nCache config not found\n")
+	first_time = user_input("Do you want to use the remote cache feature?\nY/N : ")
+
+	if first_time.lower == "n" or first_time.lower == "no" then
+		pc.create_folder(home_dir + "/Config", "hackcache")
+		pc.touch(cache_folder + "/", "config.txt")
+		CacheConfig_json = toJSON(CacheConfig)
+		z = pc.File(cache_config).set_content(CacheConfig_json)
+		return 
+	end if
+
+	CacheConfig.usecache = true
+	globals.CacheServer = false
+	print("
+Are you an admin on the cache server?
+
+WARNING: you do not want to do this on a server you don't own
+since the cache server could be used to sniff your credentials
+
+this script will not store your password anywhere on the system
+so the only way you can lose credentials is if the cache server is
+compromised
+")
+	we_admin = user_input("Are we wanting Admin mode?\nY/N : ")
+	
+	if we_admin.lower == "y" or we_admin.lower == "yes" then
+		CacheConfig.admin = true
+	end if
+
+	while CacheServer == false
+		cache_server = user_input("IP:Port of the cache ssh server\nIP:port : ")
+
+		if cache_server.indexOf(":") then
+			a = cache_server.split(":")
+			CacheConfig.server.ip = a[0]
+			CacheConfig.server.port = a[1].to_int
+			globals.Cacheaddr = CacheConfig.server.ip
+			globals.Cacheport = CacheConfig.server.port
+
+			if CacheConfig.admin then
+				print("<color=#FF0000>WARNING:</color> admin mode is active, this is meant only for populating the cache server")
+
+				print("if you dont want to use this, disable it in the source and recompile")
+
+				print("to continue enter your root password on the cache server\n")
+				CacheConfig.server.username = "root"
+				globals.Cacheusername = CacheConfig.server.username
+				globals.Cachepassword = user_input("Password : ", true)
+				repo_shell = get_shell.connect_service(Cacheaddr, Cacheport, Cacheusername, Cachepassword, "ssh")
+			else
+				globals.Cacheusername = CacheConfig.server.username
+				globals.Cachepassword = CacheConfig.server.username
+				repo_shell = get_shell.connect_service(Cacheaddr, Cacheport, Cacheusername, Cachepassword, "ssh")
+			end if
+
+			wait(1)
+
+			if repo_shell then
+				if CacheConfig.admin == 1 then
+					clear_screen
+					print("connection made... skipping tests because admin mode")
+					testrepo = true
+				else
+					clear_screen
+					print("connection made... testing permissions")
+					testrepo = TestRepo(repo_shell)
+				end if
+
+				wait(1)
+
+				if testrepo then
+					CacheServer = true
+					pc.touch(cache_folder + "/", "config.txt")
+					CacheConfig_json = toJSON(CacheConfig)
+					z = pc.File(cache_config).set_content(CacheConfig_json)
+				end if
+			end if
+		end if
+	end while
+
+end function
+
+SetupCache = function()
+	config_file = pc.File(cache_config)
+    z = config_file.get_content
+    if z then CacheConfig = parse(z) else exit("missing config file for some reason")
+	globals.Cacheaddr = CacheConfig.server.ip
+	globals.Cacheport = CacheConfig.server.port
+	globals.Cacheusername = CacheConfig.server.username
+	if CacheConfig.admin then
+		globals.Cachepassword = user_input("Admin mode: enter root password :\n : ", true)
+	else
+		globals.Cachepassword = Cacheusername
+	end if
+    globals.Cacheuse = CacheConfig.usecache
+    globals.Cacheadmin = CacheConfig.admin
+end function
+
+ToFile = function(anyObject)
+	
+	if typeof(anyObject) == "shell" then
+		return anyObject.host_computer.File("/")
+	end if
+	
+	if typeof(anyObject) == "computer" then
+		return anyObject.File("/")
+	end if
+
+	if typeof(anyObject) == "file" then
+		while anyObject.parent
+			anyObject = anyObject.parent
+		end while
+		return anyObject
+	end if
+
+	return null
+end function
+
+CheckUser = function(anyObject)
+	rootFolder = ToFile(anyObject)
+
+	for folder in rootFolder.get_folders
+		if folder.name == "root" then
+			if folder.has_permission("r") and folder.has_permission("w") and folder.has_permission("x") then
+				return "<color=#A50000><b>root</b></color>"
+			end if
+			break
+		end if
+
+	end for
+
+	homeFolder = ToFile(anyObject)
+
+	for folder in rootFolder.get_folders
+		if folder.name == "home" then
+			for userFolder in homeFolder.get_folders
+				if userFolder.name != "guest" then
+					if userFolder.has_permission("r") and userFolder.has_permission("w") and userFolder.has_permission("x") then
+						return userFolder.name
+					end if
+
+				end if
+				break
+			end for
+			break
+		end if
+
+	end for
+
+	return "<color=#6699ff><b>guest</b></color>"
+end function
+
+GetCache = function(ret)
+	repo = get_shell.connect_service(Cacheaddr, Cacheport, Cacheusername, Cachepassword, "ssh")
+	a = repo.host_computer.File("/home/ftpguest/hackcache/" + ret.name + "-" + ret.version)
+
+	if a then
+		z = parse(a.get_content)
+		if typeof(z) == "map" then
+			globals.UsedCache = true
+			return z
+		else
+			return false
+		end if
+	else
+		return false
+	end if
+
+end function
+
+UpdateCache = function(ret)
+	ret_json = toJSON(ret)
+	repo = get_shell.connect_service(Cacheaddr, Cacheport, Cacheusername, Cachepassword, "ssh")
+	a = repo.host_computer.File("/home/ftpguest/hackcache/" + ret.name + "-" + ret.version)
+
+	if a then
+		z = a.set_content(ret_json)
+	else
+		b = repo.host_computer.touch("/home/ftpguest/hackcache/", ret.name + "-" + ret.version)
+		a = repo.host_computer.File("/home/ftpguest/hackcache/" + ret.name + "-" + ret.version)
+		z = a.set_content(ret_json)
+		zz = a.chmod("o-w")
+		zz = a.chmod("o+rx")
+		zz = a.set_owner("root")
+		zz = a.set_group("root")
+	end if
+
+end function
+
+ScanLib = function(metalib = null, metax = null)
+	
+	if not metalib then
+		return null
+	end if
+	
+	if not metax then
+		return null
+	end if
+	ret = {}
+	ret.name = metalib.lib_name
+	ret.version = metalib.version
+	if Cacheuse == true then
+		ret = GetCache(ret)
+	end if
+	if ret == false then
+		ret = {}
+		ret.name = metalib.lib_name
+		ret.version = metalib.version
+		ret.memorys = {}
+		memorys = metax.scan(metalib)
+		
+		if typeof(memorys) != "list" then
+			return null
+		end if
+
+		for memory in memorys
+			ret.memorys[memory] = []
+			data = mx.scan_address(metalib, memory).split("Unsafe check: ").replace(char(10), "")
+
+			for line in data
+				
+				if line == data[0] then
+					continue
+				end if
+				value = line[line.indexOf("<b>") + 3 : line.indexOf("</b>")]
+				ret.memorys[memory].push(value)
+			end for
+
+		end for
+
+	end if
+
+	if Cacheadmin == true and Cacheuse == true and UsedCache == false then
+		UpdateCache(ret)
+	end if
+
+	return ret
+end function
+
+SetupCacheServer = function(remote)
+	clear_screen
+	print("
+
+*************************************************************
+*       ___         _          ___                          *
+*      / __|__ _ __| |_  ___  / __| ___ _ ___ _____ _ _     *
+*     | (__/ _` / _| ' \/ -_) \__ \/ -_) '_\ V / -_) '_|    *
+*      \___\__,_\__|_||_\___| |___/\___|_|  \_/\___|_|      *
+*     |_ _|_ _  __| |_ __ _| | |__ _| |_(_)___ _ _          *
+*      | || ' \(_-<  _/ _` | | / _` |  _| / _ \ ' \         *
+*     |___|_||_/__/\__\__,_|_|_\__,_|\__|_\___/_||_|        *
+*                                                           *
+*************************************************************
+
+Disclaimer:
+This is meant for setting up the cache server (the server
+that holds the cache files that is accessed remotely)
+")
+
+	if remote then
+		print("You are running this in remote setup mode. This expects your target server to have an ssh open and you using the root login
+If you don't want to do a remote setup, close the script and re-run with --setup-server for local install.
+")
+		proceed = user_input("Do you wish to proceed?\n[Y/N]: ")
+		
+		if proceed.lower == "n" or proceed.lower == "no" then
+			exit
+		end if
+	else
+		print("You are running this in local setup mode. This expects that you have root access
+If you don't want to do a remote setup, close the script and re-run with --setup-server-remote for remote install.")
+		proceed = user_input("Do you wish to proceed?\n[Y/N]: ")
+		
+		if proceed.lower == "n" or proceed.lower == "no" then
+			exit
+		end if
+	end if
+
+	clear_screen
+
+	if remote then
+        cache_server = user_input("IP:Port of the cache ssh server\nIP:port : ")
+
+		if cache_server.indexOf(":") then
+			a = cache_server.split(":")
+		    Cacheaddr = a[0]
+		    Cacheport = a[1].to_int
+        end if
+		Cacheusername = "root"
+		Cachepassword = user_input("Script only runs as root, please enter root password\n : ", true)
+		server_shell = get_shell.connect_service(Cacheaddr, Cacheport, Cacheusername, Cachepassword, "ssh")
+		server = server_shell.host_computer
+	else
+		if active_user == "root" then
+			server_shell = get_shell
+			server = server_shell.host_computer
+		else
+			root_pw = user_input("Script only runs as root, please enter root password\n : ", true)
+			server = get_shell("root", root_pw).host_computer
+		end if
+
+		sshd = include_lib("/lib/libssh.so")
+
+		if not sshd then
+			server.launch("/bin/apt-get", "update")
+			server.launch("/bin/apt-get", "install libssh.so")
+			sshd = include_lib("/lib/libssh.so")
+		end if
+
+		z = sshd.install_service
+		
+		if z != true then
+			exit(z)
+		end if
+		print("ssh server installed, setting up ftpguest account")
+	end if
+
+	account = server.create_user("ftpguest", "ftpguest")
+	
+	if account == "Error: can't create user. ftpguest already exists." then
+		server.change_password("ftpguest", "ftpguest")
+	end if
+	print("securing the server")
+	server_root = server.File("/")
+	server_home = server.File("/home/ftpguest/")
+	z = server_root.chmod("o-rwx", true)
+
+	if server_home then
+		z = server.create_folder("/home/ftpguest/", "hackcache")
+		z = server_home.chmod("o+rx", true)
+		z = server_home.set_owner("root", true)
+		z = server_home.set_group("root", true)
+	else
+		z = server.create_folder("/home/", "ftpguest")
+		if z then
+			server_home = server.File("/home/ftpguest/")
+			z = server.create_folder("/home/ftpguest/", "hackcache")
+			z = server_home.chmod("o+rx", true)
+			z = server_home.set_owner("root", true)
+			z = server_home.set_group("root", true)
+		else
+			exit(z)
+		end if
+	end if
+
+	clear_screen
+	exit("
+server should be configured and secured.
+
+The ftpguest account only has access to the /home/ftpguest with read and execute permissions.
+
+The guest account has had it's access removed from every other file and folder on the system.
+If this server is used for anything else, you may need to fix some permissions.
+")
+end function
+
+// End of Functions
+
+if params.len == 1 and params[0] == "--setup-server" then
+	SetupCacheServer(false)
+end if
+
+if params.len == 1 and params[0] == "--setup-server-remote" then
+	SetupCacheServer(true)
+end if
+
+if params.len < 2 or params.len > 3 or params[0] == "-h" or params[0] == "--help" then
+	exit(usage_output)
+end if
+// The meat of the program starts here
+
+if not pc.File(cache_config) then
+	CreateCache
+end if
+
+SetupCache()
+wait(1)
+targetIP = params[0]
+
+if not is_valid_ip(targetIP) then
+	targetIP = nslookup(targetIP)
+end if
+
+if not is_valid_ip(targetIP) then
+	exit("IP address invalid.")
+end if
+targetPort = params[1].to_int
+
+if typeof(targetPort) != "number" then
+	exit("Port needs to be a number.")
+end if
+
+if targetPort < 0 or targetPort > 65535 then
+	exit("Port range is 0-65535.")
+end if
+injectArg = ""
+
+if params.len > 2 then
+	injectArg = params[2]
+end if
+ns = mx.net_use(targetIP, targetPort)
+
+if not ns then
+	exit("Cannot connect to net session.")
+end if
+lib = ns.dump_lib
+
+if not lib then
+	exit("Cannot dump library.")
+end if
+
+// Scans for remote exploits.
+
+exploits = ScanLib(lib, mx)
+
+if not exploits then
+	exit
+end if
+// Use exploits in auto hack.
+objects = []
+
+for memory in exploits.memorys
+	for value in memory.value
+		result = lib.overflow(memory.key, value, injectArg)
+		
+		if typeof(result) != "shell" and typeof(result) != "computer" and typeof(result) != "file" then
+			continue
+		end if
+		objects.push(result)
+	end for
+
+end for
+
+
+if objects.len == 0 then
+	exit("No shells found.")
+end if
+option = 0
+
+while option <= 0 or option > objects.len
+	info = "ID TYPE USER"
+	i = 1
+
+	for object in objects
+		
+		if typeof(object) == "shell" then
+			info = info + "\n" + str(i) + "<color=#A50000><b> " + typeof(object) + " </b></color>" + CheckUser(object)
+		end if
+		
+		if typeof(object) != "shell" then
+			info = info + "\n" + str(i) + "<color=#6699ff><b> " + typeof(object) + " </b></color>" + CheckUser(object)
+		end if
+		i = i + 1
+	end for
+
+	print(format_columns(info) + "\n")
+
+	option = user_input("Enter ID: ").to_int
+	
+	if typeof(option) != "number" then
+		exit("Option ID out of range.")
+	end if
+end while
+
+
+if option <= 0 or option > objects.len then
+	exit("Option ID out of range.")
+end if
+object = objects[option - 1]
+
+if typeof(object) == "shell" then
+	object.start_terminal
+else if typeof(object) == "computer" then
+	homeFolder = object.File("/home")
+	
+	if not homeFolder then
+		exit("Cannot find home directory.")
+	end if
+	result = null
+
+	for userFolder in homeFolder.get_folders
+		if userFolder.name != "guest" then
+			for configFolder in userFolder.get_folders
+				if configFolder.name == "Config" then
+					result = configFolder
+					break
+				end if
+
+			end for
+
+		end if
+
+	end for
+
+	file = object.File("/etc/passwd")
+
+	if file != null and file.has_permission("r") then
+		print("Password file:\n" + file.get_content)
+	end if
+
+	print("Mail Accounts:")
+
+	for file in result.get_files
+		
+		if not file.has_permission("r") then
+			continue
+		end if
+		
+		if file.name == "Mail.txt" then
+			print(file.get_content)
+		end if
+	end for
+
+	print("Bank Accounts:")
+
+	for file in result.get_files
+		
+		if not file.has_permission("r") then
+			continue
+		end if
+		
+		if file.name == "Bank.txt" then
+			print(file.get_content)
+		end if
+	end for
+
+else if typeof(object) == "file" then
+	rootFolder = object
+
+	while rootFolder.parent
+		rootFolder = rootFolder.parent
+	end while
+
+	result = null
+
+	for folder in rootFolder.get_folders
+		if folder.name == "home" then
+			for userFolder in folder.get_folders
+				if userFolder.name != "guest" then
+					for configFolder in userFolder.get_folders
+						if configFolder.name == "Config" then
+							result = configFolder
+							break
+						end if
+
+					end for
+
+				end if
+
+			end for
+
+		end if
+
+	end for
+
+	filePasswd = null
+
+	for folder in rootFolder.get_folders
+		if folder.name == "etc" then
+			for file in folder.get_files
+				filePasswd = file
+				break
+			end for
+
+		end if
+
+	end for
+
+	if filePasswd != null and filePasswd.has_permission("r") then
+		print("Passwords:\n" + filePasswd.get_content + "\n")
+	end if
+
+	print("Mail Accounts:")
+
+	for file in result.get_files
+		
+		if not file.has_permission("r") then
+			continue
+		end if
+		
+		if file.name == "Mail.txt" then
+			print(file.get_content)
+		end if
+	end for
+
+	print("Bank Accounts:")
+
+	for file in result.get_files
+		
+		if not file.has_permission("r") then
+			continue
+		end if
+		
+		if file.name == "Bank.txt" then
+			print(file.get_content)
+		end if
+	end for
+
+end if
