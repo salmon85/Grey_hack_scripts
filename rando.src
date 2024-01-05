@@ -1,0 +1,83 @@
+// rando
+
+// a program that looks for a folder in /root/ with the permissions of 705 (that contains your exploits
+// that you upload to systems) and renames it randomly every 10 minutes
+
+// This script is mainly used for keeping your external servers secure. It expects the guest user to have
+// no permissions in any other folder other than this singular folder. It also expects no other users in the /home/
+// folder. This is to make sure that if someone gets into your server, they can't run anything. Since the guest user
+// can access this folder in /root/, if it was named something obvious then they could guess programs nammed in this
+// folder to run. This script stops that by changing the folder name every 10 minutes
+
+// you can change this delay (seconds) to whatever you want
+delay = 600
+
+// where is our 705 permission folder located
+paylods_subdir = "/root/"
+
+// how long do we want the foldername to be
+folder_length = 15
+
+
+// check if we are root
+if active_user == "root" then
+	pc = get_shell.host_computer
+else
+	root_pw = user_input("Script only runs as root, please enter root password\n", true)
+	pc = get_shell("root", root_pw).host_computer
+end if
+
+
+// Set up the printable characters... I suppose I could have just typed them in the array but I wanted to act clever
+printable_characters = []
+
+// Numbers ascii
+for i in range(48,57)
+	printable_characters.push(char(i))
+end for
+
+// Uppercase ascii
+for i in range(65,90)
+	printable_characters.push(char(i))
+end for
+
+// Lowercase ascii
+for i in range(97,122)
+	printable_characters.push(char(i))
+end for
+
+// Find the folder and rename. Uses time and not current_date since current_date is the ingame date and a month ingame
+// is two days realtime. Time is how long it has been since the script was ran.
+
+while true
+	folders = pc.File(paylods_subdir).get_folders
+	for folder in folders
+		// Check for 705 permission. This is to stop it renaming any random new folder since new stuff uses 755 permissions
+		if folder.permissions == "drwx---r-x" then
+			// Do the truffle shuffle (shuffles the characters randomly)
+			printable_characters.shuffle
+			newname = ""
+			// Grab the first set of characyers from the array up to the limit set earlier
+			for letter in printable_characters[:folder_length]
+				newname = newname + letter
+			end for
+			// Rename the folder
+			folder.rename(newname)
+		end if
+	end for
+	
+	// Set up the timer
+	// Grab the current time since script start and floor it (since it gives a float)
+	starttime = floor(time)
+	// Set the end time with the offset set earlier
+	endtime = starttime + delay
+	// This wait is here because I've noticed programs in the game can execute too quickly for some logic to kick in.
+	// Even with this wait, it still changes the folder name a few times in quick succession before the while loop kicks in.
+	wait(1)
+	while floor(time) < endtime
+		remainingtime = round(endtime - time)
+		clear_screen
+		print(remainingtime + "    : until next randomization")
+		wait(1)
+	end while
+end while

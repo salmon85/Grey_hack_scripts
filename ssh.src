@@ -1,0 +1,70 @@
+// Command: ssh
+
+// Created by Salmon85
+// This is a fixed version of ssh to match closer to the actual program
+
+usage = "usage: ssh"+char(9)+"[user@]ip[:port] [-p port]"
+
+if params.len < 1 or params.len > 3 or params.len == 2 or params[0] == "-h" or params[0] == "--help" then exit(usage)
+
+// What params are we working with
+
+username = ""
+ip = ""
+port = 22
+
+username_provided = false
+port_in_username = false
+
+// all 3 params given (user@ip -p and port)
+if params.len == 3 then
+	indexp = params.indexOf("-p")
+	if indexp == null then exit(usage)
+	if indexp == 0 then username = params[2]
+	if indexp == 1 then username = params[0]
+	if indexp == 2 then exit(usage)
+	port = params[indexp + 1].to_int
+else 
+	username = params[0]
+end if
+
+
+if username.indexOf("@") then username_provided = true else username_provided = false
+if username.indexOf(":") then port_in_username = true else port_in_username = false
+
+if username_provided then
+	credentials = username.split("@")
+	ip = credentials[1]
+	username = credentials[0]
+	if port_in_username then
+		if params.indexOf("-p") then exit("-p not required if passing port via :")
+		credentials = ip.split(":")
+		port = credentials[1].to_int
+		ip = credentials[0]
+	end if
+else
+	ip = username
+	username = active_user
+	if port_in_username then
+		credentials = ip.split(":")
+		port = credentials[1].to_int
+		ip = credentials[0]
+	end if
+end if
+
+
+if typeof(port) != "number" then exit("Invalid port: " + port)
+if port < 0 or port > 65535 then exit("Invalid port: " + port)
+if ip == "localhost" or ip == "127.0.0.1" then ip = get_shell.host_computer.local_ip
+if is_valid_ip(ip) == false then exit("Invalid ip: " + ip)
+
+password = user_input(username+"@"+ip+"'s password: ", true)
+
+shell = get_shell.connect_service(ip, port, username, password, "ssh")
+
+if typeof(shell) == "string" then exit(shell)
+if shell then 
+    shell.start_terminal
+else 
+    print("Permission denied, please try again.")
+end if

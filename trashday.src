@@ -1,0 +1,54 @@
+// Trashday
+
+// uses root to delete the .Trash folder in all users directories (including /root/.Trash) every second
+// only use this if you're someone like me who expects deleted items to be gone (no backsies)
+
+// This script can be placed in /etc/init.d/ on your home computer (external servers don't have this option yet)
+// and it will open this script on boot. Note: scripts in init.d open on your screen, they aren't hidden
+
+
+// clear screen
+clear_screen
+
+// checks if already root, if not root ask for root password
+// the true in the user_input means "password" and will mask it in terminal
+if active_user == "root" then
+	pc = get_shell.host_computer
+else
+	root_pw = user_input("Script only runs as root, please enter root password\n", true)
+	pc = get_shell("root", root_pw).host_computer
+end if
+
+// connect as root
+pc = get_shell("root", root_pw).host_computer
+
+// wait 1s and clear screen again
+wait(1)
+clear_screen
+
+
+print("Cleaning out all users .Trash folders every second. Leave this open")
+
+
+while true
+	// list of users (this should auto populate, leave root alone)
+	users = ["root"]
+
+	// get the other users and push them onto the stack
+	other_users = pc.File("/home/").get_folders
+	for user in other_users
+		users.push(user.name)
+	end for
+	
+	// time to take out the trash
+	for user in users
+		if user == "root" then
+			trash = pc.File("/root/.Trash")
+			if trash then trash.delete
+		else
+			trash = pc.File("/home/" + user + "/.Trash")
+			if trash then trash.delete
+		end if
+	end for
+	wait(1)
+end while

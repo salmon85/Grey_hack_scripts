@@ -1,0 +1,92 @@
+// New decipher
+
+// Handes inline user:hash or a txt file containing the users and hashes
+// Uses a cache of cracked hashes for quick lookup in future
+
+cryptools = include_lib("/lib/crypto.so")
+if not cryptools then cryptools = include_lib(parent_path(program_path) + "/crypto.so")
+if not cryptools then exit("Error: Missing crypto library")
+
+
+if params.len < 1 then exit("Usage: " + program_path.split("/")[-1] + " user:hash or .txt file")
+input = params[0]
+pc = get_shell.host_computer
+
+// check for cache folder
+
+cache_folder = home_dir + "/Config/hashcache"
+if not pc.File(cache_folder) then
+	pc.create_folder(home_dir + "/Config", "hashcache")
+	pc.touch(cache_folder + "/", "cache.txt")
+	print("Created missing cache folder in " + cache_folder)
+end if
+
+// check for files in the cache folder
+cache_files = pc.File(cache_folder).get_files
+
+// if cache is empty, make a blank cache file
+if cache_files.len == 0 then 
+	pc.touch(cache_folder + "/", "cache.txt")
+	cache_files = pc.File(cache_folder).get_files
+end if
+
+// check if input is a file
+
+if input.indexOf(":") then is_file = false else is_file = true
+
+if is_file then
+	file = pc.File(input)
+	if not file then exit("can't find " + input)
+	if not file.has_permission("r") then exit("can't read file. Permission denied")
+	if file.get_content.len == 0 then exit("decipher: no users found")
+	work_list = file.get_content.split("\n") 
+else
+	work_list = input.split(" ")
+end if
+
+
+// load cache into memory
+
+load_cache = function()
+	globals.cache = {}
+	for cache_file in cache_files
+		globals.cache_file = cache_file
+		globals.cache_file_content = cache_file.get_content
+		if cache_file_content != "" then
+			passwords = cache_file_content.split("\n")
+			for pass in passwords
+				if pass.len > 0 then
+					pass = pass.split(":")
+					cache[pass[0]] = pass[1]
+				end if
+			end for
+		end if
+	end for
+end function
+load_cache()
+
+for i in range(0, work_list.len - 1)
+	work = work_list[i].split(":")
+	user = work[0]
+	password = work[1]
+
+	if cache.hasIndex(password) then
+		password = cache[password]
+	else
+		decyphed_password = cryptools.decipher(password)
+		if not decyphed_password then
+			print("can't find the password")
+			continue 
+		end if
+		if cache_file_content != "" then
+			z = cache_file.set_content(cache_file_content + char(10) + password + ":" + decyphed_password)
+		else
+			z = cache_file.set_content(password + ":" + decyphed_password)
+		end if
+		if z != 1 then exit(z)
+		password = decyphed_password
+		end if
+	load_cache()
+	work_list[i] = user + ":" + password
+	print(work_list[i])
+end for
