@@ -7,9 +7,16 @@ cryptools = include_lib("/lib/crypto.so")
 if not cryptools then cryptools = include_lib(parent_path(program_path) + "/crypto.so")
 if not cryptools then exit("Error: Missing crypto library")
 
+help_info = "Usage: " + program_path.split("/")[-1] + " user:hash or .txt file
+Can handle multiple inline hashes or txt files
 
-if params.len < 1 then exit("Usage: " + program_path.split("/")[-1] + " user:hash or .txt file")
-input = params[0]
+Example: decipher georgankh.org:db2f350a3fd44f4e6ae5d4f2d4ccf3bf a.txt root:db2f350a3fd44f4e6ae5d4f2d4ccf3bf b.txt
+"
+
+if params.len < 1 then exit(help_info)
+if params.len == 1 and (params[0] == "-h" or params[0] == "-help") then exit(help_info)
+
+
 pc = get_shell.host_computer
 
 // check for cache folder
@@ -30,21 +37,44 @@ if cache_files.len == 0 then
 	cache_files = pc.File(cache_folder).get_files
 end if
 
-// check if input is a file
 
-if input.indexOf(":") then is_file = false else is_file = true
 
-if is_file then
-	file = pc.File(input)
-	if not file then exit("can't find " + input)
-	if not file.has_permission("r") then exit("can't read file. Permission denied")
-	if file.get_content.len == 0 then exit("decipher: no users found")
-	work_list = file.get_content.split("\n") 
-else
-	work_list = input.split(" ")
+if params.len == 1 then
+	input = params[0]
+	// check if input is a file
+	if input.indexOf(":") then is_file = false else is_file = true
+
+	if is_file then
+		file = pc.File(input)
+		if not file then exit("can't find " + input)
+		if not file.has_permission("r") then exit("can't read file. Permission denied")
+		if file.get_content.len == 0 then exit("decipher: file is empty")
+		work_list = file.get_content.split("\n") 
+	else
+		work_list = input.split(" ")
+	end if
+
+else if params.len > 1 then
+	work_list = []
+	for input in params
+		if input.indexOf(":") then is_file = false else is_file = true
+		if is_file then
+			file = pc.File(input)
+			if not file then exit("can't find " + input)
+			if not file.has_permission("r") then exit("can't read file. Permission denied")
+			if file.get_content.len == 0 then exit("decipher: file is empty")
+			work_content = file.get_content.split("\n")
+			for line in work_content
+				work_list.push(line)
+			end for
+		else
+			work_content = input.split(" ")
+			for line in work_content
+				work_list.push(line)
+			end for
+		end if
+	end for
 end if
-
-
 // load cache into memory
 
 load_cache = function()
@@ -66,27 +96,30 @@ end function
 load_cache()
 
 for i in range(0, work_list.len - 1)
-	work = work_list[i].split(":")
-	user = work[0]
-	password = work[1]
+	test = work_list[i].split(":")
+	if test[0] and test[1] then
+		work = work_list[i].split(":")
+		user = work[0]
+		password = work[1]
 
-	if cache.hasIndex(password) then
-		password = cache[password]
-	else
-		decyphed_password = cryptools.decipher(password)
-		if not decyphed_password then
-			print("can't find the password")
-			continue 
-		end if
-		if cache_file_content != "" then
-			z = cache_file.set_content(cache_file_content + char(10) + password + ":" + decyphed_password)
+		if cache.hasIndex(password) then
+			password = cache[password]
 		else
-			z = cache_file.set_content(password + ":" + decyphed_password)
-		end if
-		if z != 1 then exit(z)
-		password = decyphed_password
-		end if
-	load_cache()
-	work_list[i] = user + ":" + password
-	print(work_list[i])
+			decyphed_password = cryptools.decipher(password)
+			if not decyphed_password then
+				print("can't find the password")
+				continue 
+			end if
+			if cache_file_content != "" then
+				z = cache_file.set_content(cache_file_content + char(10) + password + ":" + decyphed_password)
+			else
+				z = cache_file.set_content(password + ":" + decyphed_password)
+			end if
+			if z != 1 then exit(z)
+			password = decyphed_password
+			end if
+		load_cache()
+		work_list[i] = user + ":" + password
+		print(work_list[i])
+	end if
 end for
