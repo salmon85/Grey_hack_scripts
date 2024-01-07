@@ -1,0 +1,19 @@
+// my attempt at a tqdm (from python) in greyscript
+
+// tqdm shows you a progress bar for a for loop with how long it took (iter/s or s per iter)
+
+if globals.tqdm_time then continue else globals.tqdm_time = ""
+
+tqdm = function(work, current_pos, clear)
+    //if globals.tqdm_time then continue else globals.tqdm_time = time
+    if current_pos == 0 then percent = 0 else percent = floor((current_pos/work.len)*100)
+    text = ""
+    // shame there is no switch and case function I can use
+    if str(percent).len == 3 then text = percent+"%|"
+    if str(percent).len == 2 then text = " "+percent+"%|"
+    if str(percent).len == 1 then text = "  "+percent+"%|"
+
+    text = text + ("█"*floor(0.2*percent)) + (" "*(20-floor(0.2*percent))) + "| " + current_pos + "/" + work.len
+    print(text,clear)
+end function
+
