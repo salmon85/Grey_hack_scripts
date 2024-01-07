@@ -1,0 +1,102 @@
+ip_range = function(ip1, ip2)
+	octets1 = ip1.split("\.")
+	octets2 = ip2.split("\.")
+	
+	if octets1.len != octets2.len then
+		exit("ip address octets don't match")
+	end if
+
+	for i in range(0, octets1.len - 1)
+		octets1[i] = octets1[i].to_int
+		octets2[i] = octets2[i].to_int
+	end for
+
+	oct1_diff = octets2[0] - octets1[0]
+
+	oct2_diff = octets2[1] - octets1[1]
+
+	oct3_diff = octets2[2] - octets1[2]
+
+	oct4_diff = octets2[3] - octets1[3]
+
+	big_list = []
+	big_list.push(ip1)
+
+	ip_changes = oct4_diff + (oct3_diff * 256) + (oct2_diff * (256 * 256)) + (oct1_diff * (256 * 256 * 256))
+
+	if ip_changes >= 60000 then
+		input = user_input("Warning: This range has " + str(ip_changes + 1) + " ip addresses\nIt will take a while to calculate them\nDo you want to continue? Y/N : ")
+		
+		if not (input.lower == "y" or input.lower == "yes") then
+			exit("Exited: ")
+		end if
+	end if
+
+	for i in range(ip_changes, 1)
+		octets1[3] = octets1[3] + 1
+
+		if octets1[3] == 256 then
+			octets1[3] = 0
+			octets1[2] = octets1[2] + 1
+		end if
+
+		if octets1[2] == 256 then
+			octets1[2] = 0
+			octets1[1] = octets1[1] + 1
+		end if
+
+		if octets1[1] == 256 then
+			octets1[1] = 0
+			octets1[0] = octets1[1] + 1
+		end if
+
+		new_ip = octets1[0] + "." + octets1[1] + "." + octets1[2] + "." + octets1[3]
+		big_list.push(new_ip)
+	end for
+
+	return big_list
+end function
+
+cidr_range = function(ip, cidr)
+	octets1 = ip.split("\.")
+	for i in range(0, octets1.len - 1)
+		octets1[i] = octets1[i].to_int
+	end for
+	octets1[3] = 0
+	new_ip = octets1[0] + "." + octets1[1] + "." + octets1[2] + "." + octets1[3]
+	big_list = []
+	big_list.push(new_ip)
+	ip_changes = 2^(32 - cidr.to_int) - 1
+
+	if ip_changes >= 60000 then
+		input = user_input("Warning: This range has " + str(ip_changes + 1) + " ip addresses\nIt will take a while to calculate them\nDo you want to continue? Y/N : ")
+		
+		if not (input.lower == "y" or input.lower == "yes") then
+			exit("Exited: ")
+		end if
+	end if
+
+	for i in range(ip_changes, 1)
+		octets1[3] = octets1[3] + 1
+
+		if octets1[3] == 256 then
+			octets1[3] = 0
+			octets1[2] = octets1[2] + 1
+		end if
+
+		if octets1[2] == 256 then
+			octets1[2] = 0
+			octets1[1] = octets1[1] + 1
+		end if
+
+		if octets1[1] == 256 then
+			octets1[1] = 0
+			octets1[0] = octets1[1] + 1
+		end if
+
+		new_ip = octets1[0] + "." + octets1[1] + "." + octets1[2] + "." + octets1[3]
+		big_list.push(new_ip)
+	end for
+
+	return big_list
+end function

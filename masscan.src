@@ -1,0 +1,157 @@
+// masscan (mass scan) : a tool for scanning all teh things
+
+import_code("/home/salmon/src/includes/networking.src")
+
+vInfo = "
+
+ ######   ######     ###    ##    ##       ###    ##       ##          ######## ######## ##     ## 
+##    ## ##    ##   ## ##   ###   ##      ## ##   ##       ##             ##    ##       ##     ## 
+##       ##        ##   ##  ####  ##     ##   ##  ##       ##             ##    ##       ##     ## 
+ ######  ##       ##     ## ## ## ##    ##     ## ##       ##             ##    ######   ######### 
+      ## ##       ######### ##  ####    ######### ##       ##             ##    ##       ##     ## 
+##    ## ##    ## ##     ## ##   ###    ##     ## ##       ##             ##    ##       ##     ## 
+ ######   ######  ##     ## ##    ##    ##     ## ######## ########       ##    ######## ##     ## 
+######## ##     ## #### ##    ##  ######    ######                                                 
+   ##    ##     ##  ##  ###   ## ##    ##  ##    ##                                                
+   ##    ##     ##  ##  ####  ## ##        ##                                                      
+   ##    #########  ##  ## ## ## ##   ####  ######                                                 
+   ##    ##     ##  ##  ##  #### ##    ##        ##                                                
+   ##    ##     ##  ##  ##   ### ##    ##  ##    ##                                                
+   ##    ##     ## #### ##    ##  ######    ######                                                 
+                  ~=                                                 M?              ,=~
+                   ==                                                MD           ~=~=~
+                   ====                                               +        :=~===
+                   ~====~                        ~                    M     :~======
+                    ~=====~           ~         ==               ~==  M   ~========
+                     ~====~~~        ,==       ~==            ,====   Z~~=========
+                     =======~=~      ~===,     ===~          =====   ===========~
+                     ,===========:   ~=====   :===~       ,======:===~~=======~~
+                      =~===========  ~======  ~====     ,~===========+========~
+                      ,~=============~=======~===~=~  ~==============M=======~
+                       =============~~======?MNDDM~~==========~======M~=====~
+                        ================M=,,,,,,,,,D~======M   N=====N=====~
+         ==~            =================~N~,,,,,,,:M8MMMNM   O M====~=====
+          ,===~,         ~=================~~MM~          M     M========= 
+            ~===~=       :=================~N             OM   M ===?~=== 
+              ~====~~     ==============M   M     ?M ~   8Z      ~:=N~==:
+    M          ~======~=~  ============M O     ?M +7MMMMMMMI      8=M~==
+   NO:7:        :======================7    M=  MNMMMMMMMMMM       +N==
+MMO:::::?         =======================8M~M ~MMMMMMMMMMMMMM      M+~~                     ,===~
+M,::::::::N        =======================N  MMMMMMMMMMMMMMMM      M~=    :=~~=~         ~=~~==~
+:,:::::::::Z         =====================7    MMMMMMMMMMMMMM      M===~=====~       ,=~~====
+?:::::::::::M    ==========================M    ~MMMMMMMMMMMM     II========      :~=======
+ ,::::::::::,     ,========================~8     MMMMMMMMMMI     M?M======    =======~==
+ 8:::::::::::N      ===~====================+N    MMMMMMMMMM      I?I===~= ~==========~
+   D:::::::::         ======================MM    MMMMMMMMM ,    I???M==~===========
+    N~==OMMZZ7         :================~+M===M    8::~,  =N    M????D============~
+           OZZM     ~===============~==M~~=====M               O??????===========
+           ,MZZM=~==================OO=~========M~           DD???????M========~
+            ~MZZZ?===============MM=~===========~7?NMMZZNNM7?I????????7~======
+    ~~~~,     :ZZZM============N+================N?????????????????????O====~=~~~~~~===~~:,
+     =========~,MOZM~=======NN====================M????????????????????N==========================,
+      ===========MZZO=~===M~=~====================~?????????????????????~========================~=~
+       ~~=========?ZZZNN8==========================MI???????????????????M=====================~~
+       =============NMZM============================????????????????????O=================~
+        ===========~~MZZO~==========================M????????????????????============~,
+         =============OZZZN=========================M????????????????????~========,
+          ~============~MZZM~~======================8????????????????????~=====
+           ~============~MZZM======================~?????????????????????~~===
+"
+
+program_name = program_path.split("/")[-1]
+
+
+uInfo = "
+Usage:
+"+program_name+" 10.0.0.0/8
+scan ports on 10.x.x.x
+
+ip address(s), accepts singles separated with , or range, or cidr (ranges and cidr also separated with ,)
+
+example "+program_name+" 127.0.0.1,192.168.1.0-192.168.1.255,10.0.0.0/8
+will scan 127.0.0.1 192.168.1.x and 10.x.x.x
+"
+
+if params.len < 1 or params[0] == "-h" or params[0] == "--help" then exit(uInfo)
+if params.len == 1 and (params[0] == "-v"	or params[0] == "--version") then exit(vInfo)
+if not get_shell.host_computer.is_network_active then exit("nmap: No internet access.")
+
+
+//nslookup(address)
+
+ScanIp = function(ipAddress)
+  isLanIp = is_lan_ip( ipAddress )
+  if isLanIp then router = get_router else router = get_router( ipAddress )
+  if router == null then return "failed"
+  ports = []
+  if not isLanIp then ports = router.used_ports else ports = router.device_ports(ipAddress)
+  if ports == null then ports = []
+  info = []
+  if ports.len > 0 then
+    for port in ports
+      if port.port_number > 0 then
+        portinfo = router.port_info(port)
+        service_info = portinfo.split(" ")
+        service_name = service_info[0]
+        service_version = service_info[1]
+        lan_ips = port.get_lan_ip
+        port_status = "open"
+        if(port.is_closed and not isLanIp) then port_status = "closed"
+        info.push({"port": port.port_number, "status": port_status, "service": service_name, "version": service_version, "lan_ip": lan_ips})
+      end if
+    end for
+  else
+    service_name = "router"
+    service_version = router.kernel_version
+    lan_ips = ""
+    if not service_version then service_version = "kernel_router.so not found"
+    port_status = "open"
+    if not service_version then port_status = "closed"
+    info.push({"port": 0, "status": port_status, "service": service_name, "version": service_version, "lan_ip": lan_ips})
+  end if
+  return info
+end function
+
+get_ips = function(data)
+  if data.indexOf("-") then
+    a = data.split("-")
+    the_list = ip_range(a[0], a[1])
+    return the_list
+  else if data.indexOf("/") then
+    a = data.split("/")
+    start_ip = a[0]
+    cidr = a[1].to_int
+    the_list = cidr_range(a[0], a[1])
+    return the_list
+  else
+    return nslookup(str(data))
+  end if
+end function
+
+if params.len >= 1 then
+  ips=[]
+  for i in range(0,params.len-1)
+    if is_valid_ip(params[i]) then
+      ips.push(params[i])
+    else
+      more_ips = get_ips(params[i])
+      if not more_ips then continue
+      if more_ips.len == 1 then if is_valid_ip(more_ips) then ips.push(more_ips) else continue
+      if more_ips.len > 1 then
+        for ip in more_ips
+          if is_valid_ip(ip) then ips.push(ip) else continue
+        end for
+      end if
+    end if
+  end for
+end if
+
+for ip in ips
+  ip_info = ScanIp(ip)
+  output = ""
+  for a in ip_info
+    output = output + "\n" + ip + " " + a.port + " " + a.status + " " + a.service + " " + a.version + " "+lan_ip
+  end for
+  print(format_columns(output) + "\n")
+  wait(0.2)
+end for
