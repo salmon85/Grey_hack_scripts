@@ -62,11 +62,17 @@ cidr_range = function(ip, cidr)
 	for i in range(0, octets1.len - 1)
 		octets1[i] = octets1[i].to_int
 	end for
-	octets1[3] = 0
+	if cidr.to_int < 0 or cidr.to_int > 32 then exit("Invalid Cidr value")
+    if cidr.to_int <= 24 then octets1[3] = 0
+    total_host = 2^(32 - cidr.to_int)
+    if cidr.to_int > 24 and cidr.to_int < 32 then
+        if octets1[3] > total_host then octets1[3] = total_host else octets1[3] = 0
+    end if
+
 	new_ip = octets1[0] + "." + octets1[1] + "." + octets1[2] + "." + octets1[3]
 	big_list = []
 	big_list.push(new_ip)
-	ip_changes = 2^(32 - cidr.to_int) - 1
+	ip_changes = total_host - 1
 
 	if ip_changes >= 60000 then
 		input = user_input("Warning: This range has " + str(ip_changes + 1) + " ip addresses\nIt will take a while to calculate them\nDo you want to continue? Y/N : ")
@@ -75,28 +81,29 @@ cidr_range = function(ip, cidr)
 			exit("Exited: ")
 		end if
 	end if
+    if ip_changes > 0 then
+        for i in range(ip_changes, 1)
+            octets1[3] = octets1[3] + 1
 
-	for i in range(ip_changes, 1)
-		octets1[3] = octets1[3] + 1
+            if octets1[3] == 256 then
+                octets1[3] = 0
+                octets1[2] = octets1[2] + 1
+            end if
 
-		if octets1[3] == 256 then
-			octets1[3] = 0
-			octets1[2] = octets1[2] + 1
-		end if
+            if octets1[2] == 256 then
+                octets1[2] = 0
+                octets1[1] = octets1[1] + 1
+            end if
 
-		if octets1[2] == 256 then
-			octets1[2] = 0
-			octets1[1] = octets1[1] + 1
-		end if
+            if octets1[1] == 256 then
+                octets1[1] = 0
+                octets1[0] = octets1[1] + 1
+            end if
 
-		if octets1[1] == 256 then
-			octets1[1] = 0
-			octets1[0] = octets1[1] + 1
-		end if
-
-		new_ip = octets1[0] + "." + octets1[1] + "." + octets1[2] + "." + octets1[3]
-		big_list.push(new_ip)
-	end for
+            new_ip = octets1[0] + "." + octets1[1] + "." + octets1[2] + "." + octets1[3]
+            big_list.push(new_ip)
+        end for
+    end if
 
 	return big_list
 end function
