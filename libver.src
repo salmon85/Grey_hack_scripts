@@ -1,0 +1,34 @@
+//command libver
+// just for grabbing version numbers of the lib
+// can scan a whole folder
+
+mx = include_lib("/lib/metaxploit.so")
+if not mx then mx = include_lib(parent_path(program_path) + "/metaxploit.so")
+if not mx then exit("Cannot find metaxploit.so")
+
+if params.len != 1 or params[0] == "-h" or params[0] == "--help" then exit("libver <library.so / folder>")
+
+input = params[0]
+
+pc = get_shell.host_computer
+
+
+
+check_lib = function(filename)
+	lib = mx.load(filename)
+	if not lib then exit("Error: missing " +filename)
+	return(lib)
+end function
+
+if input.indexOf(".so") then
+	lib = check_lib(input) 
+	print(input + " : " +lib.version)
+else
+	if not pc.File(input) then exit("libver <library.so / folder>")
+	lib_files = pc.File(input).get_files
+	for file in lib_files
+		if input[-1:] == "/" then input = input[:-1]
+		lib = check_lib(input+"/"+file.name) 
+		print(input+"/"+file.name + " : " +lib.version)
+	end for
+end if
