@@ -37,6 +37,7 @@ globals.Cacheusername = ""
 globals.Cachepassword = ""
 globals.Cacheaddr = ""
 globals.Cacheport = 22
+globals.Cacheuse = false
 globals.UsedCache = false
 globals.Cacheadmin = false
 globals.pc = get_shell.host_computer
@@ -281,7 +282,6 @@ UpdateCache = function(ret)
 end function
 
 ScanLib = function(metalib = null, metax = null)
-	
 	if not metalib then
 		return null
 	end if
@@ -295,7 +295,7 @@ ScanLib = function(metalib = null, metax = null)
 	if Cacheuse == true then
 		ret = GetCache(ret)
 	end if
-	if ret == false then
+	if ret == false or Cacheuse == false then
 		ret = {}
 		ret.name = metalib.lib_name
 		ret.version = metalib.version
@@ -503,7 +503,7 @@ if not lib then
 end if
 
 // Scans for remote exploits.
-
+print()
 exploits = ScanLib(lib, mx)
 
 if not exploits then
